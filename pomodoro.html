@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポモドーロタイマー</title>
+    <style>
+        /* CSS: 見た目を整えます */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #d95550; /* 初期カラー (作業モード) */
+            color: white;
+            transition: background-color 0.5s ease;
+        }
+
+        .timer-container {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        #mode-display {
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        #timer-display {
+            font-size: 100px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .buttons button {
+            font-size: 20px;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: 2px solid white;
+            background-color: transparent;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .buttons button:hover {
+            background-color: white;
+            color: #333;
+        }
+
+        #pomodoro-count {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="timer-container">
+        <div id="mode-display">作業中</div>
+        <div id="timer-display">25:00</div>
+        <div class="buttons">
+            <button id="start-pause-btn">開始</button>
+            <button id="reset-btn">リセット</button>
+        </div>
+        <div id="pomodoro-count">完了したポモドーロ: 0</div>
+    </div>
+
+    <!-- 通知音用の非表示オーディオ要素 -->
+    <audio id="notification-sound" src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU_voM="></audio>
+
+    <script>
+        // JavaScript: タイマーのロジックを記述します
+        const WORK_TIME = 25 * 60; // 25分 (秒)
+        const SHORT_BREAK_TIME = 5 * 60; // 5分 (秒)
+        const LONG_BREAK_TIME = 15 * 60; // 15分 (秒)
+
+        let timer = null;
+        let timeLeft = WORK_TIME;
+        let isRunning = false;
+        let mode = 'work'; // 'work', 'shortBreak', 'longBreak'
+        let pomodoroCount = 0;
+
+        // DOM要素の取得
+        const timerDisplay = document.getElementById('timer-display');
+        const modeDisplay = document.getElementById('mode-display');
+        const startPauseBtn = document.getElementById('start-pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const pomodoroCountDisplay = document.getElementById('pomodoro-count');
+        const notificationSound = document.getElementById('notification-sound');
+
+        // 時間を MM:SS 形式にフォーマットする関数
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // モードを切り替える関数
+        function switchMode(newMode) {
+            mode = newMode;
+            isRunning = false;
+            startPauseBtn.textContent = '開始';
+            clearInterval(timer);
+
+            switch (mode) {
+                case 'work':
+                    timeLeft = WORK_TIME;
+                    modeDisplay.textContent = '作業中';
+                    document.body.style.backgroundColor = '#d95550'; // 赤系
+                    break;
+                case 'shortBreak':
+                    timeLeft = SHORT_BREAK_TIME;
+                    modeDisplay.textContent = '短い休憩';
+                    document.body.style.backgroundColor = '#4c9195'; // 青緑系
+                    break;
+                case 'longBreak':
+                    timeLeft = LONG_BREAK_TIME;
+                    modeDisplay.textContent = '長い休憩';
+                    document.body.style.backgroundColor = '#457ca3'; // 青系
+                    break;
+            }
+            updateDisplay();
+        }
+        
+        // タイマーを進める関数
+        function tick() {
+            timeLeft--;
+            updateDisplay();
+
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                isRunning = false;
+                notificationSound.play(); // 通知音を再生
+                
+                if (mode === 'work') {
+                    pomodoroCount++;
+                    pomodoroCountDisplay.textContent = `完了したポモドーロ: ${pomodoroCount}`;
+                    // 4回ごとに長い休憩、それ以外は短い休憩
+                    if (pomodoroCount % 4 === 0) {
+                        switchMode('longBreak');
+                    } else {
+                        switchMode('shortBreak');
+                    }
+                } else {
+                    // 休憩が終わったら作業モードに戻る
+                    switchMode('work');
+                }
+            }
+        }
+        
+        // 開始/一時停止ボタンの処理
+        startPauseBtn.addEventListener('click', () => {
+            if (isRunning) {
+                clearInterval(timer);
+                isRunning = false;
+                startPauseBtn.textContent = '開始';
+            } else {
+                isRunning = true;
+                startPauseBtn.textContent = '一時停止';
+                timer = setInterval(tick, 1000);
+            }
+        });
+
+        // リセットボタンの処理
+        resetBtn.addEventListener('click', () => {
+            if (confirm('タイマーとポモドーロカウントをリセットしますか？')) {
+                clearInterval(timer);
+                isRunning = false;
+                pomodoroCount = 0;
+                pomodoroCountDisplay.textContent = `完了したポモドーロ: 0`;
+                switchMode('work');
+            }
+        });
+        
+        // 初期表示
+        updateDisplay();
+    </script>
+</body>
+</html>
